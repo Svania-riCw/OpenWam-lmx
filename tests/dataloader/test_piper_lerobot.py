@@ -5,7 +5,11 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from openwam.dataloader.piper_lerobot import PiperLeRobotDataset
+from openwam.dataloader.piper_lerobot import (
+    GRIPPER_CONVENTION,
+    REPRESENTATION,
+    PiperLeRobotDataset,
+)
 from openwam.dataloader.registry import DATASET_REGISTRY
 from openwam.dataloader.utils.normalization import ROT6D_DIMS_EEF20
 from openwam.dataloader.utils.piper_kinematics import joint14_to_eef20, piper_forward_kinematics
@@ -69,3 +73,35 @@ def test_reader_normalization_preserves_rot6d() -> None:
     raw = joint14_to_eef20(joints)
     normalized = reader._normalize_eef(joints, stats)
     np.testing.assert_array_equal(normalized[:, ROT6D_DIMS_EEF20], raw[:, ROT6D_DIMS_EEF20])
+
+
+def test_reader_preserves_directional_stats_for_deployment(tmp_path: Path) -> None:
+    def stats(offset: float) -> dict:
+        return {
+            "mean": np.full(20, offset, dtype=np.float32),
+            "std": np.ones(20, dtype=np.float32),
+            "min": np.full(20, -1.0 + offset, dtype=np.float32),
+            "max": np.full(20, 1.0 + offset, dtype=np.float32),
+            "q01": np.full(20, -0.9 + offset, dtype=np.float32),
+            "q99": np.full(20, 0.9 + offset, dtype=np.float32),
+            "representation": REPRESENTATION,
+            "gripper_convention": GRIPPER_CONVENTION,
+        }
+
+    stats_path = tmp_path / "piper_eef_normalization_stats.npy"
+    np.save(stats_path, {"eef": stats(0.0), "eef_state": stats(0.25)}, allow_pickle=True)
+
+    reader = object.__new__(PiperLeRobotDataset)
+    reader._normalize_mode = "min-max"
+    reader._source_stats_path = str(stats_path)
+    reader._dataset_dir = tmp_path
+    reader._state_normalization_stats = None
+
+    action_stats = reader._load_stats({})
+
+    assert reader.normalization_stats_path == str(stats_path)
+    assert action_stats is not None
+    np.testing.assert_allclose(action_stats["mean"], 0.0)
+    np.testing.assert_allclose(reader._state_normalization_stats["mean"][:3], 0.25)
+    saved = np.load(reader.normalization_stats_path, allow_pickle=True).item()
+    assert {"eef", "eef_state"} <= set(saved)

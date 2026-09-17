@@ -14,7 +14,6 @@ import pandas as pd
 from openwam.dataloader.bases import LeRobotV3Reader
 from openwam.dataloader.utils.normalization import (
     ROT6D_DIMS_EEF20,
-    STAT_KEYS,
     apply_normalization,
     materialize_eef_stats,
 )
@@ -168,7 +167,10 @@ class PiperLeRobotDataset(LeRobotV3Reader):
             source_hint=f"{stats_path}:{STATE_STATS_KEY}",
             force_rot6d_identity=True,
         )
-        self._write_deploy_normalizer_stats(action_stats, STAT_KEYS)
+        # The source file is already the deployment artifact. Keep both the
+        # action block used for output unnormalization and the state block used
+        # for proprio normalization when the trainer copies it into the run.
+        self.normalization_stats_path = str(stats_path)
         return action_stats
 
     @staticmethod
