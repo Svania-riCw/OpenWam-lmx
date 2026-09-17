@@ -1,0 +1,36 @@
+# Dual-arm Piper LeRobot v3 data. Joint targets and measured joints are
+# converted through Piper FK to absolute EEF20 before normalization.
+type: piper_lerobot
+dataset_dir: /2025233210/xiaojx/data/multitask_merged_v1
+
+action_mode: eef
+unify_action: true
+unify_action_map: ["0-9", "34-43"]
+unify_state_map: null
+
+# 33 source steps produce the 32-action horizon expected by OpenWAM-Alpha.
+# At 30 fps and stride 4, each sample contains nine video frames.
+num_frames: 33
+video_stride: 4
+window_stride: 1
+split: train
+
+height: 384
+width: 320
+multiview: true
+camera_layout:
+  - observation.images.fixed_front
+  - observation.images.left_arm
+  - observation.images.right_arm
+target_camera: observation.images.fixed_front
+
+# Separate action/state EEF20 stats are generated automatically at
+# <dataset_dir>/meta/piper_eef_normalization_stats.npy on first construction.
+normalize_mode: min-max
+
+color_jitter:
+  enabled: true
+  brightness: 0.2
+  contrast: 0.2
+  saturation: 0.2
+  hue: 0.0
